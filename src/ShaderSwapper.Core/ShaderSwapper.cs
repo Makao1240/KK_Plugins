@@ -16,9 +16,12 @@ using System.Linq;
 using UnityEngine.UI;
 using System.Xml.Linq;
 using ADV.Commands.Base;
-using ActionGame.Chara.Mover;
 using System.IO;
 using Screencap;
+
+#if AI || HS2
+using AIChara;
+#endif
 
 namespace KK_Plugins
 {
@@ -201,6 +204,7 @@ namespace KK_Plugins
         internal static ConfigEntry<KeyboardShortcut> ForceSwapShadersHotkey { get; private set; }
         internal static ConfigEntry<float> TesselationSlider { get; private set; }
 
+#if KK || KKS
         private readonly Dictionary<string, SwapTargetList> VanillaPlusShaders = new Dictionary<string, SwapTargetList>
         {
             { "Shader Forge/main_skin", new SwapTargetList("xukmi/SkinPlus") },
@@ -376,6 +380,49 @@ namespace KK_Plugins
             { "Standard", new SwapTargetList("KKUTSitem_Tess") },
         };
 
+#elif AI || HS2
+
+        private readonly Dictionary<string, SwapTargetList> HanmenNxtgShaders = new Dictionary<string, SwapTargetList>
+        {
+            { "AIT/Skin True", new SwapTargetList("Hanmen/Next-Gen Body") },
+            { "AIT/Skin True Face", new SwapTargetList("Hanmen/Next-Gen Face") },
+
+            // TODO: present option buttons for the hair slots to pick between Next-Gen Hair Alpha, Bluenoise and Bayer (similar to the HS2_HairShaderSwapper plugin). For now it's just a single option.
+            { "Shader Forge/hair_07", new SwapTargetList("Hanmen/Next-Gen Hair Bayer") },
+
+            { "AIT/Eye Translucency", new SwapTargetList("Hanmen/Next-Gen Eye Vanilla") },
+            { "AIT/main eyeshadow lambert", new SwapTargetList("Hanmen/Next-Gen Eyeshadow") },
+            { "AIT/eyelashes", new SwapTargetList("Hanmen/Next-Gen Eyelashes Alpha") },
+            { "AIT/main namida", new SwapTargetList("Hanmen/Namida") },
+            { "AIT/Clothes", new SwapTargetList("Hanmen/Item Cutoff") },
+            { "AIT/Clothes True", new SwapTargetList("Hanmen/Clothes True Cutoff") },
+            { "AIT/Clothes Alpha", new SwapTargetList("Hanmen/Item Alpha") },
+
+            // TODO: identify which one is for the Pantyhose slot and put Hanmen/Clothes True Pantyhose for that one.
+            { "AIT/Clothes Alpha True", new SwapTargetList("Hanmen/Clothes True Alpha") },
+
+            // obsolete shader that seems to have been used for pantyhose
+            { "Hanmen/Clothes True Transparent", new SwapTargetList("Hanmen/Clothes True Pantyhose") },
+
+            { "AIT/Clothes Alpha True BackCull", new SwapTargetList("Hanmen/Clothes True Alpha") },
+            { "AIT/Accessory", new SwapTargetList("Hanmen/Item Cutoff") },
+            { "AIT/Item", new SwapTargetList("Hanmen/Item Cutoff") },
+            { "AIT/Item studio", new SwapTargetList("Hanmen/Item Cutoff") },
+            { "AIT/main standard2 studio", new SwapTargetList("Hanmen/Item Cutoff") },
+            { "AIT/main standard2 studio alpha", new SwapTargetList("Hanmen/Item Cutoff") },
+            { "AIT/Studioitem", new SwapTargetList("Hanmen/Item Cutoff") },
+            { "GDC/Clothes True Cutoff", new SwapTargetList("Hanmen/Clothes True Cutoff") },
+            { "GDC/Item Cutoff", new SwapTargetList("Hanmen/Item Cutoff") },
+            { "hooh/ClotheReplicaOpaque", new SwapTargetList("Hanmen/Clothes True Cutoff") },
+            { "hooh/ClotheReplicaAlphaCullOff", new SwapTargetList("Hanmen/Clothes True Alpha") },
+
+            // TODO: distinguish between these two based on material name (c_m_tang vs c_m_tooth), so for now these can't be done as they have the same shader.
+            //{ "AIT/Skin Translucency simple", new SwapTargetList("Hanmen/Next-Gen Tongue") },
+            //{ "AIT/Skin Translucency simple", new SwapTargetList("Hanmen/Next-Gen Teeth") },
+        };
+
+#endif
+
         internal static ConfigEntry<bool> AutoReplace { get; private set; }
         internal static ConfigEntry<bool> DebugLogging { get; private set; }
 
@@ -418,23 +465,31 @@ namespace KK_Plugins
 
             SwapShadersHotkey = Config.Bind("Keyboard Shortcuts", "Swap Shaders", new KeyboardShortcut(KeyCode.P, KeyCode.RightControl), "Swap all shaders to the equivalent shader from the shadermapping, unless they are already changed in ME.");
             ForceSwapShadersHotkey = Config.Bind("Keyboard Shortcuts", "Force Swap Shaders", new KeyboardShortcut(KeyCode.P, KeyCode.RightControl, KeyCode.RightShift), "Swap all shaders to the equivalent shader from the shadermapping, regardless of they have been edited or not.");
+#if KK || KKS
             TesselationSlider = Config.Bind("Tesselation", "Tesselation", 0f,
                                             new ConfigDescription("The amount of tesselation to apply.  Leave at 0% to use the regular Vanilla+ shaders without tesselation.",
                                                                   new AcceptableValueRange<float>(0f, 1f)
                                             )
             );
+#endif
 
             DebugLogging = Config.Bind("General", "Verbose logging", true, "Write to log every time a shader is swapped.");
 
+#if KK || KKS
             AutoReplace = Config.Bind("General", "Auto swap to V+ shaders", false,
                                       "Automatically swap vanilla shaders to their Vanilla+ equivalents on ALL characters.\n" +
                                       "Changes take effect after character reload.\n" +
                                       "WARNING: Saving the game, cards, or scenes with this setting enabled can permanently apply the V+ shaders! You won't be able to go back to vanilla shaders without manually resetting MaterialEditor edits in the maker!");
 
             SwapStudioShadersOnCharacter = Config.Bind("General", "Studio-shaders on characters", false, "Toggles if the following shaders should be swapped on characters: [Shader Forge/main_item_studio],[Shader Forge/main_item_studio_alpha],[ShaderForge/main_StandartMDK_studio] and [Standart]");
-
             AutoEnableOutline = Config.Bind("General", "Auto enable outline", true, "Automatically sets the OutlineOn shaderproperty to 1");
+#elif AI || HS2
+            AutoReplace = Config.Bind("General", "Auto swap to Next-gen shaders", false,
+                                      "Automatically swap vanilla shaders to their Next-gen equivalents on ALL characters.\n" +
+                                      "Changes take effect after character reload.\n" +
+                                      "WARNING: Saving the game, cards, or scenes with this setting enabled can permanently apply the Next-gen shaders! You won't be able to go back to vanilla shaders without manually resetting MaterialEditor edits in the maker!");
 
+#endif
             void ApplyPatches(bool enable)
             {
                 var autoReplacePatchTargetM = AccessTools.Method(typeof(MaterialEditorCharaController), "LoadCharacterExtSaveData");
@@ -448,6 +503,7 @@ namespace KK_Plugins
             if (AutoReplace.Value) ApplyPatches(true);
 
             // XML stuff
+#if KK || KKS
             string plusNormalPath = "./UserData/config/shader_swapper_plus_normal.xml";
             string plusTessPath = "./UserData/config/shader_swapper_plus_tess.xml";
             string azStandardLT5Path = "./UserData/config/shader_swapper_az_standard_lt5_normal+tess.xml";
@@ -455,8 +511,12 @@ namespace KK_Plugins
             string ussPath = "./UserData/config/shader_swapper_uss_normal.xml";
             string utsNormalPath = "./UserData/config/shader_swapper_uts_normal.xml";
             string utsTessPath = "./UserData/config/shader_swapper_uts_tess.xml";
+#elif AI || HS2
+            string hanmenNxtgPath = "./UserData/config/shader_swapper_hanmen_nxtg.xml";
+#endif
 
-            NormalMapping = Config.Bind("Mapping", "Normal Shader Mapping", plusNormalPath, new ConfigDescription("XML file with mapping for shaders which is used when the tesselation setting = 0", null, new ConfigurationManagerAttributes { CustomDrawer = FileInputDrawer }));
+#if KK || KKS 
+            NormalMapping = Config.Bind("Mapping", "Normal Shader Mapping", plusNormalPath, new ConfigDescription("XML file with mapping for shaders which is used when the tesselation setting = 0", null, new ConfigurationManagerAttributes { CustomDrawer = FileInputDrawer }));      
             TessMapping = Config.Bind("Mapping", "Tess Shader Mapping", plusTessPath, new ConfigDescription("XML file with mapping for shaders which is used when the tesselation setting > 0", null, new ConfigurationManagerAttributes { CustomDrawer = FileInputDrawer }));
             if (!File.Exists(plusNormalPath)) setShaderMapping(plusNormalPath, VanillaPlusShaders);
             if (!File.Exists(plusTessPath)) setShaderMapping(plusTessPath, VanillaPlusTesselationShaders);
@@ -465,13 +525,19 @@ namespace KK_Plugins
             if (!File.Exists(ussPath)) setShaderMapping(ussPath, USSShaders);
             if (!File.Exists(utsNormalPath)) setShaderMapping(utsNormalPath, UTSShaders);
             if (!File.Exists(utsTessPath)) setShaderMapping(utsTessPath, UTSTesselationShaders);
+#elif AI || HS2
+            NormalMapping = Config.Bind("Mapping", "Normal Shader Mapping", hanmenNxtgPath, new ConfigDescription("XML file with shader mapping used for swaps", null, new ConfigurationManagerAttributes { CustomDrawer = FileInputDrawer }));      
+            if (!File.Exists(hanmenNxtgPath)) setShaderMapping(hanmenNxtgPath, HanmenNxtgShaders);
+#endif
 
+#if KK || KKS
             TessMinOverride = Config.Bind("Tesselation", "TessMin Clamping", true, "Clamp the TessMin value of all xukmi *Tess shaders to 1.0 - 1.5 range to improve performance with cards that have this set way too high.\nWarning: The limited value could be saved to the card/scene (but shouldn't).");
             TessMinOverrideScreenshots = Config.Bind("Tesselation", "TessMin Override on Screenshots", true, "Temporarily override the TessMin value of all xukmi *Tess shaders to 25 when taking screenshots to potentially improve quality (minimal speed hit but may have no perceptible effect).");
 
             _harmony.Patch(AccessTools.Method(typeof(MaterialAPI), nameof(MaterialAPI.SetFloat)), prefix: new HarmonyMethod(typeof(ShaderSwapper), nameof(ShaderSwapper.SetFloatHook)));
             ScreenshotManager.OnPreCapture += () => ScreenshotEvent(25);
             ScreenshotManager.OnPostCapture += () => ScreenshotEvent(TessMinOverride.Value ? 1 : -1);
+#endif
         }
 
         internal static KKAPI.Utilities.OpenFileDialog.OpenSaveFileDialgueFlags SingleFileFlags =
@@ -577,7 +643,17 @@ namespace KK_Plugins
             if (controller.GetMaterialShader(id, mat) == null || forceSwap)
             {
                 string oldShader = mat.shader.name;
-                Dictionary<string, SwapTargetList> mapping = (TesselationSlider.Value > 0) ? VanillaPlusTessShaderMapping : VanillaPlusShaderMapping;
+
+                Dictionary<string, SwapTargetList> mapping;
+                if (TesselationSlider == null)
+                {
+                    mapping = VanillaPlusShaderMapping;
+                }
+                else
+                {
+                    mapping = (TesselationSlider.Value > 0) ? VanillaPlusTessShaderMapping : VanillaPlusShaderMapping;
+                }
+                
                 if (mapping.TryGetValue(mat.shader.name, out var swapTargetList))
                 {
                     string newShader;
@@ -595,14 +671,15 @@ namespace KK_Plugins
                     if (oldShader == "Standard")
                         controller.SetMaterialFloatProperty(id, mat, "Cutoff", 0f);
 
-                    if (TesselationSlider.Value > 0)
+                    if (TesselationSlider != null && TesselationSlider.Value > 0)
                         SetTesselationValue(mat);
                 }
-
+#if KK || KKS
                 if (AutoEnableOutline.Value && mat.HasProperty("_OutlineOn"))
                 {
                     controller.SetMaterialFloatProperty(id, mat, "OutlineOn", 1f);
                 }
+#endif
             }
         }
 
@@ -611,6 +688,7 @@ namespace KK_Plugins
             if (controller.GetMaterialShader(slot, objectType, mat, go) == null || forceSwap)
             {
                 string oldShader = mat.shader.name;
+#if KK || KKS
                 if (!SwapStudioShadersOnCharacter.Value)
                 {
                     if (new List<string>() {
@@ -623,8 +701,17 @@ namespace KK_Plugins
                         return;
                     }
                 }
+#endif
+                Dictionary<string, SwapTargetList> mapping;
+                if (TesselationSlider == null)
+                {
+                    mapping = VanillaPlusShaderMapping;
+                }
+                else
+                {
+                    mapping = (TesselationSlider.Value > 0) ? VanillaPlusTessShaderMapping : VanillaPlusShaderMapping;
+                }
 
-                Dictionary<string, SwapTargetList> mapping = (TesselationSlider.Value > 0) ? VanillaPlusTessShaderMapping : VanillaPlusShaderMapping;
                 if (mapping.TryGetValue(mat.shader.name, out var swapTargetList))
                 {
                     string newShader;
@@ -640,14 +727,16 @@ namespace KK_Plugins
                     if (mat.shader.name == "xukmi/MainAlphaPlus")
                         controller.SetMaterialFloatProperty(slot, objectType, mat, "Cutoff", 0.1f, go);
 
-                    if (TesselationSlider.Value > 0)
+                    if (TesselationSlider != null && TesselationSlider.Value > 0)
                         SetTesselationValue(mat);
                 }
 
+#if KK || KKS
                 if (AutoEnableOutline.Value && mat.HasProperty("_OutlineOn"))
                 {
                     controller.SetMaterialFloatProperty(slot, objectType, mat, "OutlineOn", 1f, go);
                 }
+#endif
             }
         }
 
@@ -690,7 +779,10 @@ namespace KK_Plugins
             if (mat.HasProperty("_TessSmooth"))
             {
                 //Adjust the weight of the tesselation
-                mat.SetFloat("_TessSmooth", TesselationSlider.Value);
+                if (TesselationSlider != null)
+                {
+                    mat.SetFloat("_TessSmooth", TesselationSlider.Value);
+                }
             }
 
             // Enable tesselation in Az Standard shader
